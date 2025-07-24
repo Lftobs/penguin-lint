@@ -1,6 +1,7 @@
 # Penguin Lint
 
 Penguin Lint is a Python script that uses Abstract Syntax Trees (AST) to analyze and refactor Python code. It provides a simple framework for programmatically applying custom transformations to Python source code.
+> created to undestand how ast works 
 
 ## Features
 
