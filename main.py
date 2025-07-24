@@ -7,9 +7,15 @@ import requests
 def fetch_data(url):
     response = requests.get(url)
     print("Data fetched successfully!")
+    for i in range(5):
+        x = x * i
     return response.json()
 def main():
     data = fetch_data("https://api.example.com/data")
+    while isinstance(data, list):
+        data = data[0] if data else None
+    if data is None:
+        raise ValueError("No data found!")
     print(data)
     return data
 
@@ -54,9 +60,15 @@ class NewlineInserter(ast.NodeTransformer):
         new_body = []
         assign_count = 0
         for stmt in body:
-            if isinstance(stmt, (ast.FunctionDef, ast.ClassDef)):
+            if isinstance(stmt, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef, ast.For, ast.While, ast.If, ast.Try, ast.With)):
+                if new_body:  # Avoid blank line at the start
+                    marker = ast.Expr(value=ast.Constant(value=None))
+                    ast.copy_location(marker, stmt)
+                    new_body.append(marker)
                 assign_count = 0
                 new_body.append(stmt)
+                if hasattr(stmt, 'body'):
+                    stmt.body = self.process_block(stmt.body)
                 continue
             if isinstance(stmt, (ast.Assign, ast.AnnAssign)):  # Handle both Assign and AnnAssign
                 assign_count += 1
