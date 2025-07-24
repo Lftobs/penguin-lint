@@ -45,103 +45,29 @@ class PrintVisitor(ast.NodeTransformer):
         return node
 
 class NewlineInserter(ast.NodeTransformer):
-    def __init__(self):
-        super().__init__()
-        self.previous_end_line = None
-
     def visit_Module(self, node):
-        self.previous_end_line = None
         node.body = self.process_block(node.body)
-        return node
-
-    def visit_FunctionDef(self, node):
-        node = self.add_newline_if_needed(node)
-        self.previous_end_line = None
-        node.body = self.process_block(node.body)
-        return node
-
-    def visit_ClassDef(self, node):
-        node = self.add_newline_if_needed(node)
-        self.previous_end_line = None
-        node.body = self.process_block(node.body)
-        return node
-
-    def visit_For(self, node):
-        node = self.add_newline_if_needed(node)
-        self.previous_end_line = None
-        node.body = self.process_block(node.body)
-        return node
-
-    def visit_While(self, node):
-        node = self.add_newline_if_needed(node)
-        self.previous_end_line = None
-        node.body = self.process_block(node.body)
-        return node
-
-    def visit_AsyncFunctionDef(self, node):
-        node = self.add_newline_if_needed(node)
-        self.previous_end_line = None
-        node.body = self.process_block(node.body)
-        return node
-
-    def visit_AsyncFor(self, node):
-        node = self.add_newline_if_needed(node)
-        self.previous_end_line = None
-        node.body = self.process_block(node.body)
-        return node
-
-    def add_newline_if_needed(self, node):
-        if self.previous_end_line is not None and node.lineno - self.previous_end_line < 2:
-            # Create a marker node that will become an empty line
-            marker = ast.Expr(value=ast.Constant(value=""))
-            ast.copy_location(marker, node)
-            return [marker, node]
+        ast.fix_missing_locations(node)
         return node
 
     def process_block(self, body):
         new_body = []
-        self.previous_end_line = None
-        constant_count = 0
-
-        for i, stmt in enumerate(body):
-            # Handle adding newline before certain structures
-            if isinstance(stmt, (ast.FunctionDef, ast.ClassDef, ast.For, 
-                               ast.While, ast.AsyncFunctionDef, ast.AsyncFor)):
-                if self.previous_end_line is not None and stmt.lineno - self.previous_end_line < 2:
-                    marker = ast.Expr(value=ast.Constant(value=" "))
-                    ast.copy_location(marker, stmt)
-                    new_body.append(marker)
-                    self.previous_end_line = stmt.lineno - 1  # Adjust for new line
+        assign_count = 0
+        for stmt in body:
+            if isinstance(stmt, (ast.FunctionDef, ast.ClassDef)):
+                assign_count = 0
                 new_body.append(stmt)
-                if hasattr(stmt, 'end_lineno'):
-                    self.previous_end_line = stmt.end_lineno
-                else:
-                    self.previous_end_line = stmt.lineno
-                constant_count = 0
                 continue
-
-            # Count constant expressions (assignments and expressions)
-            if isinstance(stmt, (ast.Assign, ast.Expr, ast.AnnAssign)):
-                constant_count += 1
+            if isinstance(stmt, (ast.Assign, ast.AnnAssign)):  # Handle both Assign and AnnAssign
+                assign_count += 1
             else:
-                constant_count = 0
-
-            # Add newline after every 4 constant expressions
-            if constant_count == 4:
-                marker = ast.Expr(value=ast.Constant(value=" "))
-                ast.copy_location(marker, stmt)
-                new_body.append(marker)
-                constant_count = 0
-                self.previous_end_line = stmt.lineno  # Reset line tracking
-
+                assign_count = 0
             new_body.append(stmt)
-            
-            # Update line tracking
-            if hasattr(stmt, 'end_lineno'):
-                self.previous_end_line = stmt.end_lineno
-            else:
-                self.previous_end_line = stmt.lineno
-
+            if assign_count == 4:
+                marker = ast.Expr(value=ast.Constant(value=None))
+                ast.copy_location(marker, stmt)  # Preserve location info
+                new_body.append(marker)
+                assign_count = 0
         return new_body
 
 def main():
@@ -153,11 +79,16 @@ def main():
 
     inserter = NewlineInserter()
     modified_tree = inserter.visit(modified_tree)
+    
     # Unparse the modified TREE
     new_code = ast.unparse(modified_tree)
     
+    lines = new_code.split('\n')
+    processed_lines = ['' if line.strip() == 'None' else line for line in lines]
+    final_code = '\n'.join(processed_lines)
+    
     print("Modified code:")
-    print(new_code)
+    print(final_code)
 
 
 if __name__ == "__main__":
